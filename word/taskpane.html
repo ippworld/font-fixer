@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Font Fixer for Word</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{--bg:#f3f5f7;--card:#fff;--ink:#14202b;--mut:#5b6875;--line:#dde3e9;--acc:#0e6b66;--accfg:#fff;--soft:#e3f2f0;--r:10px}
+@media(prefers-color-scheme:dark){:root{--bg:#151a1f;--card:#1e252c;--ink:#eef2f5;--mut:#9aa7b3;--line:#313b45;--acc:#3cc2b8;--accfg:#06201e;--soft:#173432}}
+*{box-sizing:border-box}
+body{margin:0;padding:14px 14px 28px;background:var(--bg);color:var(--ink);font:13px/1.45 "Segoe UI",-apple-system,"SF Pro Text",system-ui,sans-serif}
+header{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+.mark{width:36px;height:36px;border-radius:10px;background:var(--acc);color:var(--accfg);display:grid;place-items:center;font:700 17px/1 Georgia,"Times New Roman",serif}
+h1{font-size:16px;margin:0;font-weight:650}header p{margin:0;color:var(--mut);font-size:12px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px}
+.step h2{display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 10px;font-weight:650}
+.num{width:20px;height:20px;border-radius:50%;background:var(--soft);color:var(--acc);display:grid;place-items:center;font-size:11px;font-weight:700}
+.done .num{background:var(--acc);color:var(--accfg);font-size:0}.done .num::after{content:"\2713";font-size:11px}
+button{width:100%;padding:8px 10px;border-radius:7px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--acc);background:var(--acc);color:var(--accfg)}
+button.ghost{background:transparent;color:var(--acc)}
+button:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#summary{color:var(--mut);margin:8px 0 0;font-size:12px}#summary:empty{display:none}
+#fonts{margin-top:6px;max-height:220px;overflow:auto}#fonts:empty{display:none}
+.row{display:grid;grid-template-columns:auto 1fr;column-gap:9px;padding:7px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.row>input{grid-row:1/4;margin:3px 0 0}.row>:not(input){grid-column:2}
+.nm{font-size:15px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row small{color:var(--mut);font-size:11.5px}
+.bar{display:block;height:3px;margin-top:4px;border-radius:2px;background:var(--line)}.bar b{display:block;height:100%;border-radius:2px;background:var(--acc)}
+.f{display:block;font-weight:600;font-size:12px;margin-bottom:10px}
+.f select,.f input{display:block;width:100%;margin-top:4px;padding:6px 8px;font:inherit;font-weight:400;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px}
+#specimen{margin:0 0 12px;padding:12px;border-radius:8px;background:var(--soft);min-height:68px}
+#specText{display:block;font-size:22px;line-height:1.3;overflow-wrap:anywhere}
+#specNote{display:block;margin-top:5px;font-size:11px;color:var(--mut)}
+.opt{display:flex;gap:8px;padding:5px 0;align-items:flex-start;cursor:pointer}.opt input{margin-top:3px}
+.opt small{display:block;color:var(--mut);font-size:11.5px}
+#apply{margin-top:6px}
+.note{margin:0 0 10px;padding:10px 12px;border-radius:8px;background:var(--soft);font-size:12px;line-height:1.5}
+.note b{display:block;margin-bottom:4px;font-weight:650}
+.note ul{margin:0;padding-left:16px}.note li{margin:2px 0}
+#log{margin:10px 0 0;padding:10px;border-radius:8px;background:var(--card);border:1px solid var(--line);white-space:pre-wrap;max-height:130px;overflow:auto;color:var(--mut);font:12px/1.5 inherit}#log:empty{display:none}
+body.busy::before{content:"";position:fixed;top:0;left:0;height:3px;width:40%;background:var(--acc);animation:slide 1s ease-in-out infinite}
+@keyframes slide{from{left:-40%}to{left:100%}}
+@media(prefers-reduced-motion:reduce){body.busy::before{animation:none;width:100%}}
+[hidden]{display:none!important}</style></head>
+<body>
+<header><div class="mark" aria-hidden="true">Aa</div><div><h1>Font Fixer</h1><p>Replace fonts across the whole document</p></div></header>
+
+<section class="step" id="s1">
+  <h2><span class="num">1</span>Find the fonts in this document</h2>
+  <button id="scan" class="ghost">Scan document</button>
+  <p id="summary"></p>
+  <div id="fonts"></div>
+</section>
+
+<section class="step">
+  <h2><span class="num">2</span>Choose the replacement</h2>
+  <label class="f">Language of the translated document<select id="lang"></select></label>
+  <label class="f">Replacement font<input id="target" list="suggest" placeholder="e.g. Yu Gothic"></label><datalist id="suggest"></datalist>
+  <div id="specimen"><span id="specText"></span><span id="specNote"></span></div>
+  <label class="opt"><input type="checkbox" id="latin" checked><span>Match Latin text too<small>Numbers and English use the same font.</small></span></label>
+  <label class="opt"><input type="checkbox" id="force"><span>Force on every text run<small>Use this if some text still looks wrong.</small></span></label>
+</section>
+
+<section class="step">
+  <h2><span class="num">3</span>Apply to the document</h2>
+  <label class="f">How to apply<select id="mode"><option value="new">Open a fixed copy in a new window (safest)</option><option value="replace">Replace this document</option></select></label>
+  <div class="note"><b>What to expect</b><span id="modeText"></span></div>
+  <label class="opt" id="backupRow" hidden><input type="checkbox" id="backup"><span>I saved a backup copy<small>Required before the button turns on.</small></span></label>
+  <button id="apply">Fix fonts</button>
+  <pre id="log"></pre>
+</section>
+<script src="fontlogic.js"></script><script src="taskpane.js"></script>
+</body></html>
