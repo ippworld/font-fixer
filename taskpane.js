@@ -1,0 +1,84 @@
+const $ = id => document.getElementById(id);
+const log = m => { $('log').textContent += m + '\n'; $('log').scrollTop = 1e9; };
+const busy = b => ['scan', 'apply'].forEach(i => $(i).disabled = b || (i === 'apply' && !$('backup').checked));
+let scanned = false;
+
+// --- read the open presentation as a .pptx (works on Windows, Mac and web) ---
+function getFile() {
+  return new Promise((res, rej) => {
+    Office.context.document.getFileAsync(Office.FileType.Compressed, { sliceSize: 4194304 }, r => {
+      if (r.status !== Office.AsyncResultStatus.Succeeded) return rej(r.error);
+      const f = r.value, parts = []; let i = 0;
+      (function next() {
+        f.getSliceAsync(i, s => {
+          if (s.status !== Office.AsyncResultStatus.Succeeded) { f.closeAsync(); return rej(s.error); }
+          parts[i] = s.value.data;
+          if (++i < f.sliceCount) return next();
+          f.closeAsync();
+          const all = new Uint8Array(parts.reduce((a, p) => a + p.length, 0)); let o = 0;
+          parts.forEach(p => { all.set(p, o); o += p.length; });
+          res(all);
+        });
+      })();
+    });
+  });
+}
+const load = async () => JSZip.loadAsync(await getFile());
+
+// --- write back: insert the fixed deck (keeping its own masters/theme), then delete the originals ---
+async function replaceSlides(b64) {
+  await PowerPoint.run(async ctx => {
+    const slides = ctx.presentation.slides; slides.load('items/id'); await ctx.sync();
+    const old = slides.items.map(s => s.id);
+    ctx.presentation.insertSlidesFromBase64(b64, { formatting: 'KeepSourceFormatting', targetSlideId: old[old.length - 1] });
+    await ctx.sync();
+    old.forEach(id => ctx.presentation.slides.getItem(id).delete());
+    await ctx.sync();
+  });
+}
+
+async function doScan() {
+  const zip = await load(), found = await FontFix.scan(zip), box = $('fonts');
+  box.textContent = '';
+  [...found].sort((a, b) => b[1].n - a[1].n).forEach(([name, v]) => {
+    const row = document.createElement('label'); row.className = 'row';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = name; cb.checked = !FontFix.SYMBOL.test(name);
+    const nm = document.createElement('span'); nm.textContent = name;
+    const sm = document.createElement('small'); sm.textContent = `${v.n}× · ${[...v.areas].join(', ')}`;
+    row.append(cb, nm, sm); box.append(row);
+  });
+  scanned = found.size > 0;
+  log(found.size ? `Found ${found.size} font(s). Untick any you want to keep (symbol fonts are unticked by default).` : 'No explicit fonts found (everything inherits theme fonts).');
+}
+
+Office.onReady(() => {
+  const sel = $('lang');
+  Object.entries(FontFix.LANGS).forEach(([k, v]) => sel.add(new Option(v.label, k)));
+  const suggest = () => {
+    $('suggest').textContent = '';
+    FontFix.LANGS[sel.value].fonts.forEach(f => $('suggest').append(new Option(f)));
+    $('latin').checked = true; $('latin').disabled = !FontFix.LANGS[sel.value].slot;
+  };
+  sel.onchange = suggest; suggest();
+  $('backup').onchange = () => busy(false);
+
+  $('scan').onclick = async () => { busy(true); try { await doScan(); } catch (e) { log('Error: ' + (e.message || e)); } busy(false); };
+  $('apply').onclick = async () => {
+    busy(true);
+    try {
+      const target = $('target').value.trim();
+      if (!target) throw new Error('Enter a target font.');
+      if (!scanned) throw new Error('Run "Scan presentation" first.');
+      const sel = new Set([...document.querySelectorAll('#fonts input:checked')].map(i => i.value));
+      const zip = await load();
+      const r = await FontFix.apply(zip, { target, lang: FontFix.LANGS[$('lang').value], sel, setLatin: $('latin').checked || !FontFix.LANGS[$('lang').value].slot, force: $('force').checked });
+      if (!r.changes) { log('Nothing needed changing.'); }
+      else {
+        log(`Updated ${r.changes} font setting(s) in ${r.files} part(s). Re-inserting slides…`);
+        await replaceSlides(await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' }));
+        log('Done. Re-scanning to verify…'); await doScan();
+      }
+    } catch (e) { log('Error: ' + (e.message || e)); }
+    busy(false);
+  };
+});

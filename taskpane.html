@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Translated Font Fixer</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{--bg:#fff;--fg:#201f1e;--mut:#605e5c;--line:#d2d0ce;--acc:#0f6cbd;--accfg:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#1f1f1f;--fg:#f3f2f1;--mut:#a19f9d;--line:#484644;--acc:#479ef5;--accfg:#000}}
+body{font:13px "Segoe UI",system-ui,sans-serif;margin:0;padding:12px;background:var(--bg);color:var(--fg)}
+h1{font-size:16px;margin:0 0 8px}h2{font-size:13px;margin:14px 0 6px}
+button{width:100%;padding:7px;border:0;border-radius:4px;background:var(--acc);color:var(--accfg);font-size:13px;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+select,input[list]{width:100%;box-sizing:border-box;padding:5px;margin:2px 0 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:3px}
+#fonts{max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:4px;margin-top:6px}
+#fonts:empty{display:none}
+.row,.c{display:flex;gap:6px;align-items:baseline;padding:3px 6px}.c{padding:2px 0}
+.row span{flex:1}small{color:var(--mut)}
+#log{white-space:pre-wrap;color:var(--mut);max-height:120px;overflow:auto;margin:10px 0 0;font:12px inherit}
+</style></head>
+<body>
+<h1>Translated Font Fixer</h1>
+<h2>1. Detect fonts</h2>
+<button id="scan">Scan presentation</button>
+<div id="fonts"></div>
+<h2>2. Replace with</h2>
+<label>Target language<select id="lang"></select></label>
+<label>Font name<input id="target" list="suggest" placeholder="e.g. Yu Gothic"></label><datalist id="suggest"></datalist>
+<label class="c"><input type="checkbox" id="latin" checked> Also replace the Latin font (numbers &amp; Latin text match)</label>
+<label class="c"><input type="checkbox" id="force"> Force font onto every text run (stubborn files)</label>
+<label class="c"><input type="checkbox" id="backup"> I saved a backup copy of this file</label>
+<p></p><button id="apply" disabled>Replace fonts</button>
+<pre id="log"></pre>
+<script src="fontlogic.js"></script><script src="taskpane.js"></script>
+</body></html>
