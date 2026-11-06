@@ -12,11 +12,11 @@
 
   // Language presets: which font slot carries the script, and the theme <a:font script="..."> code.
   const LANGS = {
-    ja:  { label: 'Japanese',             slot: 'ea', script: 'Jpan', fonts: ['Yu Gothic', 'Meiryo', 'MS PGothic', 'Noto Sans JP', 'Noto Serif JP'] },
-    zhs: { label: 'Chinese (Simplified)', slot: 'ea', script: 'Hans', fonts: ['Microsoft YaHei', 'SimSun', 'PingFang SC', 'Noto Sans SC', 'Noto Serif SC'] },
-    zht: { label: 'Chinese (Traditional)', slot: 'ea', script: 'Hant', fonts: ['Microsoft JhengHei', 'PMingLiU', 'PingFang TC', 'Noto Sans TC', 'Noto Serif TC'] },
-    ko:  { label: 'Korean',               slot: 'ea', script: 'Hang', fonts: ['Malgun Gothic', 'Batang', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Noto Serif KR'] },
-    th:  { label: 'Thai',                 slot: 'cs', script: 'Thai', fonts: ['Leelawadee UI', 'Tahoma', 'Cordia New', 'Noto Sans Thai', 'Noto Serif Thai'] },
+    ja:  { label: 'Japanese',             slot: 'ea', script: 'Jpan', fonts: ['Yu Gothic', 'Meiryo', 'MS PGothic', 'Noto Sans JP'] },
+    zhs: { label: 'Chinese (Simplified)', slot: 'ea', script: 'Hans', fonts: ['Microsoft YaHei', 'SimSun', 'PingFang SC', 'Noto Sans SC'] },
+    zht: { label: 'Chinese (Traditional)', slot: 'ea', script: 'Hant', fonts: ['Microsoft JhengHei', 'PMingLiU', 'PingFang TC', 'Noto Sans TC'] },
+    ko:  { label: 'Korean',               slot: 'ea', script: 'Hang', fonts: ['Malgun Gothic', 'Batang', 'Apple SD Gothic Neo', 'Noto Sans KR'] },
+    th:  { label: 'Thai',                 slot: 'cs', script: 'Thai', fonts: ['Leelawadee UI', 'Tahoma', 'Cordia New', 'Noto Sans Thai'] },
     ar:  { label: 'Arabic',               slot: 'cs', script: 'Arab', fonts: ['Segoe UI', 'Arial', 'Traditional Arabic', 'Noto Sans Arabic'] },
     he:  { label: 'Hebrew',               slot: 'cs', script: 'Hebr', fonts: ['Arial', 'Segoe UI', 'David', 'Noto Sans Hebrew'] },
     hi:  { label: 'Hindi / Devanagari',   slot: 'cs', script: 'Deva', fonts: ['Nirmala UI', 'Mangal', 'Noto Sans Devanagari'] },
