@@ -1,6 +1,17 @@
 const $ = id => document.getElementById(id);
 const log = m => { $('log').textContent += m + '\n'; $('log').scrollTop = 1e9; };
-const busy = b => ['scan', 'apply'].forEach(i => $(i).disabled = b || (i === 'apply' && !$('backup').checked));
+const busy = b => {
+  document.body.classList.toggle('busy', b);
+  ['scan', 'apply'].forEach(i => $(i).disabled = b || (i === 'apply' && !$('backup').checked));
+};
+const SAMPLES = { ja: '日本語のフォント見本', zhs: '简体中文字体示例', zht: '繁體中文字體範例', ko: '한국어 글꼴 미리보기', th: 'ตัวอย่างฟอนต์ภาษาไทย', ar: 'معاينة الخط العربي', he: 'תצוגה מקדימה של גופן', hi: 'हिन्दी फ़ॉन्ट पूर्वावलोकन', lat: 'The quick brown fox' };
+function specimen() {
+  const f = $('target').value.trim(), l = $('lang').value;
+  $('specText').textContent = SAMPLES[l] + ' Aa 0123';
+  $('specText').dir = (l === 'ar' || l === 'he') ? 'rtl' : 'ltr';
+  $('specText').style.fontFamily = f ? JSON.stringify(f) + ', sans-serif' : '';
+  $('specNote').textContent = f ? `Preview in ${f} (shows only if the font is installed)` : 'Type a font name to preview it';
+}
 let scanned = false;
 
 // --- read the open presentation as a .pptx (works on Windows, Mac and web) ---
@@ -40,13 +51,17 @@ async function replaceSlides(b64) {
 async function doScan() {
   const zip = await load(), found = await FontFix.scan(zip), box = $('fonts');
   box.textContent = '';
+  const max = Math.max(1, ...[...found.values()].map(v => v.n));
   [...found].sort((a, b) => b[1].n - a[1].n).forEach(([name, v]) => {
     const row = document.createElement('label'); row.className = 'row';
     const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = name; cb.checked = !FontFix.SYMBOL.test(name);
-    const nm = document.createElement('span'); nm.textContent = name;
-    const sm = document.createElement('small'); sm.textContent = `${v.n}× · ${[...v.areas].join(', ')}`;
-    row.append(cb, nm, sm); box.append(row);
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = name; nm.style.fontFamily = JSON.stringify(name) + ', sans-serif';
+    const sm = document.createElement('small'); sm.textContent = `${v.n} use${v.n > 1 ? 's' : ''} in ${[...v.areas].join(', ')}`;
+    const bar = document.createElement('i'); bar.className = 'bar'; const fill = document.createElement('b'); fill.style.width = Math.max(4, 100 * v.n / max) + '%'; bar.append(fill);
+    row.append(cb, nm, sm, bar); box.append(row);
   });
+  $('summary').textContent = found.size ? `${found.size} font${found.size > 1 ? 's' : ''} found. Untick any you want to keep.` : 'No explicit fonts found.';
+  $('s1').classList.toggle('done', found.size > 0);
   scanned = found.size > 0;
   log(found.size ? `Found ${found.size} font(s). Untick any you want to keep (symbol fonts are unticked by default).` : 'No explicit fonts found (everything inherits theme fonts).');
 }
@@ -59,7 +74,7 @@ Office.onReady(() => {
     FontFix.LANGS[sel.value].fonts.forEach(f => $('suggest').append(new Option(f)));
     $('latin').checked = true; $('latin').disabled = !FontFix.LANGS[sel.value].slot;
   };
-  sel.onchange = suggest; suggest();
+  sel.onchange = () => { suggest(); specimen(); }; suggest(); specimen(); $('target').oninput = specimen;
   $('backup').onchange = () => busy(false);
 
   $('scan').onclick = async () => { busy(true); try { await doScan(); } catch (e) { log('Error: ' + (e.message || e)); } busy(false); };
