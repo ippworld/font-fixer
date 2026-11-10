@@ -13,6 +13,7 @@ function specimen() {
   const f = $('target').value.trim(), l = $('lang').value;
   $('specText').textContent = l ? SAMPLES[l] + ' Aa 0123' : 'Aa 0123';
   $('specText').dir = (l === 'ar' || l === 'he') ? 'rtl' : 'ltr';
+  document.querySelectorAll('#chips button').forEach(b => b.classList.toggle('on', b.textContent === f));
   $('specText').style.fontFamily = f ? JSON.stringify(f) + ', sans-serif' : '';
   $('specNote').textContent = f ? `Preview in ${f} (shows only if the font is installed)` : 'Type a font name to preview it';
 }
@@ -78,7 +79,10 @@ Office.onReady(() => {
     $('suggest').textContent = '';
     const L = FontFix.LANGS[sel.value];
     $('target').placeholder = L ? 'e.g. ' + L.fonts[0] : 'Select a language first';
+    const chips = $('chips'); chips.textContent = '';
+    $('hint').textContent = L ? 'Tap a suggested font above, or type the name of any font installed on your computer.' : 'First choose the language, then pick a suggested font or type your own.';
     if (!L) { $('latin').disabled = false; return; }
+    L.fonts.forEach(f => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f; b.onclick = () => { $('target').value = f; specimen(); }; chips.append(b); });
     L.fonts.forEach(f => $('suggest').append(new Option(f)));
     $('latin').checked = true; $('latin').disabled = !L.slot;
   };

@@ -41,9 +41,13 @@ button:disabled{opacity:.4;cursor:not-allowed}
 body.busy::before{content:"";position:fixed;top:0;left:0;height:3px;width:40%;background:var(--acc);animation:slide 1s ease-in-out infinite}
 @keyframes slide{from{left:-40%}to{left:100%}}
 @media(prefers-reduced-motion:reduce){body.busy::before{animation:none;width:100%}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 6px}.chips:empty{display:none}
+.chips button{width:auto;padding:4px 10px;border-radius:999px;background:transparent;color:var(--acc);border:1px solid var(--line);font-weight:500;font-size:12px}
+.chips button:hover{border-color:var(--acc)}.chips button.on{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
+.hint{margin:0 0 10px;color:var(--mut);font-size:12px}
 .ver{margin-left:4px;padding:1px 7px;border-radius:999px;background:var(--soft);color:var(--acc);font-size:10.5px;font-weight:600;vertical-align:middle;white-space:nowrap}[hidden]{display:none!important}</style></head>
 <body>
-<header><div class="mark" aria-hidden="true">Aa</div><div><h1>Font Fixer <span class="ver" id="ver">v1.3 · 10 Nov 2026</span></h1><p>Replace fonts across the whole document</p></div></header>
+<header><div class="mark" aria-hidden="true">Aa</div><div><h1>Font Fixer <span class="ver" id="ver">v1.4 · 10 Nov 2026</span></h1><p>Replace fonts across the whole document</p></div></header>
 
 <section class="step" id="s1">
   <h2><span class="num">1</span>Find the fonts in this document</h2>
@@ -55,7 +59,9 @@ body.busy::before{content:"";position:fixed;top:0;left:0;height:3px;width:40%;ba
 <section class="step">
   <h2><span class="num">2</span>Choose the replacement</h2>
   <label class="f">Language of the translated document<select id="lang"></select></label>
-  <label class="f">Replacement font<input id="target" list="suggest" placeholder="Select a language first"></label><datalist id="suggest"></datalist>
+  <label class="f">Replacement font<input id="target" list="suggest" placeholder="Select a language first" autocomplete="off"></label><datalist id="suggest"></datalist>
+  <div id="chips" class="chips" role="group" aria-label="Suggested fonts"></div>
+  <p class="hint" id="hint">First choose the language, then pick a suggested font or type your own.</p>
   <div id="specimen"><span id="specText"></span><span id="specNote"></span></div>
   <label class="opt"><input type="checkbox" id="latin" checked><span>Match Latin text too<small>Numbers and English use the same font.</small></span></label>
   <label class="opt"><input type="checkbox" id="everywhere" checked><span>Replace in every font slot<small>Also complex-script and East Asian fonts, bullets in lists, and other theme scripts, so no copy of the old font is left.</small></span></label>
