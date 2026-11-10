@@ -44,7 +44,7 @@
     xml = xml.replace(A_FONT, (m, slot) => {
       if (!slots[slot]) return m;
       const f = unesc(faceOf(m));
-      if (f[0] === '+' || !(f === '' || sel.has(f))) return m;
+      if (f[0] === '+' || !((f === '' && !slots.extra[slot]) || sel.has(f))) return m;
       n++; return `<a:${slot} typeface="${esc(target)}"/>`;
     });
     if (theme && lang.script) {
@@ -52,13 +52,19 @@
       const tag = `<a:font script="${lang.script}" typeface="${esc(target)}"/>`;
       xml = xml.replace(/<a:(major|minor)Font>[\s\S]*?<\/a:\1Font>/g, blk => { n++; return re.test(blk) ? blk.replace(re, () => tag) : blk.replace(/<\/a:(major|minor)Font>/, m => tag + m); });
     }
+    if (theme && cfg.everywhere) {      // other per-script theme entries (Arab, Hebr, Viet...) that still name a selected font
+      xml = xml.replace(/<a:font script="\w+" typeface="([^"]*)"\s*\/>/g, (m, face) => {
+        if (!sel.has(unesc(face))) return m;
+        n++; return m.replace(/typeface="[^"]*"/, `typeface="${esc(target)}"`);
+      });
+    }
     // WordprocessingML fonts: only explicit attributes (theme-linked ones follow the updated theme)
     xml = xml.replace(W_FONT, tag => {
       let t = tag;
       for (const [attr, slot, th] of W_MAP) {
         if (!slots[slot] || new RegExp(`\\sw:${th}=`).test(t)) continue;
         const re = new RegExp(`(\\sw:${attr}=")([^"]*)(")`), m = t.match(re);
-        if (m) { const f = unesc(m[2]); if (f === '' || sel.has(f)) { t = t.replace(re, (_, a, b, c) => a + esc(target) + c); n++; } }
+        if (m) { const f = unesc(m[2]); if ((f === '' && !slots.extra[slot]) || sel.has(f)) { t = t.replace(re, (_, a, b, c) => a + esc(target) + c); n++; } }
         else if (force) { t = t.replace(/\s*\/>$/, ` w:${attr}="${esc(target)}"/>`); n++; }
       }
       return t;
@@ -77,7 +83,9 @@
   }
 
   async function apply(zip, cfg) {
-    cfg.slots = { latin: cfg.setLatin, ea: cfg.lang.slot === 'ea', cs: cfg.lang.slot === 'cs' };
+    const base = { latin: cfg.setLatin, ea: cfg.lang.slot === 'ea', cs: cfg.lang.slot === 'cs' };
+    cfg.slots = Object.assign({}, base, { extra: {} });
+    if (cfg.everywhere) for (const s of ['ea', 'cs']) if (!base[s]) { cfg.slots[s] = true; cfg.slots.extra[s] = true; }
     let files = 0, changes = 0;
     for (const p of Object.keys(zip.files).filter(p => PARTS.test(p))) {
       const src = await zip.file(p).async('string'), r = rewrite(p, src, cfg);
