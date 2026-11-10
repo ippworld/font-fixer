@@ -7,7 +7,7 @@ const busy = b => {
 const SAMPLES = { ja: '日本語のフォント見本', zhs: '简体中文字体示例', zht: '繁體中文字體範例', ko: '한국어 글꼴 미리보기', th: 'ตัวอย่างฟอนต์ภาษาไทย', ar: 'معاينة الخط العربي', he: 'תצוגה מקדימה של גופן', hi: 'हिन्दी फ़ॉन्ट पूर्वावलोकन', lat: 'The quick brown fox' };
 function specimen() {
   const f = $('target').value.trim(), l = $('lang').value;
-  $('specText').textContent = SAMPLES[l] + ' Aa 0123';
+  $('specText').textContent = l ? SAMPLES[l] + ' Aa 0123' : 'Aa 0123';
   $('specText').dir = (l === 'ar' || l === 'he') ? 'rtl' : 'ltr';
   $('specText').style.fontFamily = f ? JSON.stringify(f) + ', sans-serif' : '';
   $('specNote').textContent = f ? `Preview in ${f} (shows only if the font is installed)` : 'Type a font name to preview it';
@@ -68,11 +68,16 @@ async function doScan() {
 
 Office.onReady(() => {
   const sel = $('lang');
-  Object.entries(FontFix.LANGS).forEach(([k, v]) => sel.add(new Option(v.label, k)));
+  const ph = new Option('Select language…', '', true, true); ph.disabled = true; sel.add(ph);
+  Object.entries(FontFix.LANGS)                     // A–Z by name, "Other" last
+    .sort(([ak, a], [bk, b]) => (ak === 'lat') - (bk === 'lat') || a.label.localeCompare(b.label))
+    .forEach(([k, v]) => sel.add(new Option(v.label, k)));
   const suggest = () => {
     $('suggest').textContent = '';
-    FontFix.LANGS[sel.value].fonts.forEach(f => $('suggest').append(new Option(f)));
-    $('latin').checked = true; $('latin').disabled = !FontFix.LANGS[sel.value].slot;
+    const L = FontFix.LANGS[sel.value];
+    if (!L) { $('latin').disabled = false; return; }
+    L.fonts.forEach(f => $('suggest').append(new Option(f)));
+    $('latin').checked = true; $('latin').disabled = !L.slot;
   };
   sel.onchange = () => { suggest(); specimen(); }; suggest(); specimen(); $('target').oninput = specimen;
   $('backup').onchange = () => busy(false);
@@ -82,6 +87,7 @@ Office.onReady(() => {
     busy(true);
     try {
       const target = $('target').value.trim();
+      if (!$('lang').value) throw new Error('Choose the language of the translated file first.');
       if (!target) throw new Error('Enter a target font.');
       if (!scanned) throw new Error('Run "Scan presentation" first.');
       const sel = new Set([...document.querySelectorAll('#fonts input:checked')].map(i => i.value));

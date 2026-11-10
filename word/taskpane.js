@@ -11,7 +11,7 @@ const MODE_TEXT = {
 };
 function specimen() {
   const f = $('target').value.trim(), l = $('lang').value;
-  $('specText').textContent = SAMPLES[l] + ' Aa 0123';
+  $('specText').textContent = l ? SAMPLES[l] + ' Aa 0123' : 'Aa 0123';
   $('specText').dir = (l === 'ar' || l === 'he') ? 'rtl' : 'ltr';
   $('specText').style.fontFamily = f ? JSON.stringify(f) + ', sans-serif' : '';
   $('specNote').textContent = f ? `Preview in ${f} (shows only if the font is installed)` : 'Type a font name to preview it';
@@ -70,11 +70,16 @@ async function doScan() {
 
 Office.onReady(() => {
   const sel = $('lang');
-  Object.entries(FontFix.LANGS).forEach(([k, v]) => sel.add(new Option(v.label, k)));
+  const ph = new Option('Select language…', '', true, true); ph.disabled = true; sel.add(ph);
+  Object.entries(FontFix.LANGS)                     // A–Z by name, "Other" last
+    .sort(([ak, a], [bk, b]) => (ak === 'lat') - (bk === 'lat') || a.label.localeCompare(b.label))
+    .forEach(([k, v]) => sel.add(new Option(v.label, k)));
   const suggest = () => {
     $('suggest').textContent = '';
-    FontFix.LANGS[sel.value].fonts.forEach(f => $('suggest').append(new Option(f)));
-    $('latin').checked = true; $('latin').disabled = !FontFix.LANGS[sel.value].slot;
+    const L = FontFix.LANGS[sel.value];
+    if (!L) { $('latin').disabled = false; return; }
+    L.fonts.forEach(f => $('suggest').append(new Option(f)));
+    $('latin').checked = true; $('latin').disabled = !L.slot;
   };
   const modeUi = () => { $('modeText').textContent = MODE_TEXT[mode()]; $('backupRow').hidden = mode() !== 'replace'; refresh(false); };
   sel.onchange = () => { suggest(); specimen(); }; suggest(); specimen(); $('target').oninput = specimen;
@@ -85,6 +90,7 @@ Office.onReady(() => {
     busy(true);
     try {
       const target = $('target').value.trim();
+      if (!$('lang').value) throw new Error('Choose the language of the translated file first.');
       if (!target) throw new Error('Enter a replacement font.');
       if (!scanned) throw new Error('Run "Scan presentation" first.'.replace('presentation', 'document'));
       const chosen = new Set([...document.querySelectorAll('#fonts input:checked')].map(i => i.value));
