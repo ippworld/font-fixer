@@ -45,9 +45,15 @@ body.busy::before{content:"";position:fixed;top:0;left:0;height:3px;width:40%;ba
 .chips button{width:auto;padding:4px 10px;border-radius:999px;background:transparent;color:var(--acc);border:1px solid var(--line);font-weight:500;font-size:12px}
 .chips button:hover{border-color:var(--acc)}.chips button.on{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
 .hint{margin:0 0 10px;color:var(--mut);font-size:12px}
+.chk{margin-left:4px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:600;vertical-align:middle;white-space:nowrap;background:var(--acc);color:var(--accfg)}
+.chk.old{background:#c2410c;color:#fff}
+.upd{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 10px;margin-bottom:10px;border-radius:8px;background:#fff4ce;color:#5c4400;font-size:12px}
+.upd[hidden]{display:none}.upd button{width:auto;padding:4px 10px;font-size:12px;white-space:nowrap}
+@media(prefers-color-scheme:dark){.upd{background:#3a3000;color:#ffe9a3}}
 .ver{margin-left:4px;padding:1px 7px;border-radius:999px;background:var(--soft);color:var(--acc);font-size:10.5px;font-weight:600;vertical-align:middle;white-space:nowrap}[hidden]{display:none!important}</style></head>
 <body>
-<header><div class="mark" aria-hidden="true">Aa</div><div><h1>Font Fixer <span class="ver" id="ver">v1.4 · 10 Nov 2026</span></h1><p>Replace fonts across the whole document</p></div></header>
+<header><div class="mark" aria-hidden="true">Aa</div><div><h1>Font Fixer <span class="ver" id="ver">v1.5 · 10 Nov 2026</span><span class="chk" id="chk" hidden></span></h1><p>Replace fonts across the whole document</p></div></header>
+<div class="upd" id="upd" hidden></div>
 
 <section class="step" id="s1">
   <h2><span class="num">1</span>Find the fonts in this document</h2>
@@ -76,5 +82,5 @@ body.busy::before{content:"";position:fixed;top:0;left:0;height:3px;width:40%;ba
   <button id="apply">Fix fonts</button>
   <pre id="log"></pre>
 </section>
-<script src="fontlogic.js"></script><script src="taskpane.js"></script>
+<script src="fontlogic.js?v=1.5"></script><script src="taskpane.js?v=1.5"></script>
 </body></html>

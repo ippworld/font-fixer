@@ -4,6 +4,25 @@ const mode = () => $('mode').value;
 const refresh = b => { $('scan').disabled = b; $('apply').disabled = b || (mode() === 'replace' && !$('backup').checked); };
 const busy = b => { document.body.classList.toggle('busy', b); refresh(b); };
 let scanned = false;
+const BUILD = { app: 'word', version: '1.5', date: '10 Nov 2026' };
+const cmpV = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+function reloadLatest() { const u = new URL(location.href); u.searchParams.set('r', Date.now()); location.replace(u.toString()); }   // keeps Office's own query string
+async function checkVersion() {
+  try {
+    const r = await fetch('../version.json?t=' + Date.now(), { cache: 'no-store' });
+    const latest = (await r.json())[BUILD.app], chk = $('chk');
+    if (!latest) return;
+    chk.hidden = false;
+    if (cmpV(latest, BUILD.version) > 0) {
+      chk.textContent = 'Update available'; chk.classList.add('old');
+      const box = $('upd'); box.textContent = ''; box.hidden = false;
+      const t = document.createElement('span'); t.textContent = `A newer version (v${latest}) is available. You have v${BUILD.version}.`;
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Reload now'; b.onclick = reloadLatest;
+      box.append(t, b);
+    } else { chk.textContent = '✓ Latest'; chk.title = 'You have the newest version'; }
+  } catch (e) { /* offline or blocked: show no status */ }
+}
+
 const SAMPLES = { ja: '日本語のフォント見本', zhs: '简体中文字体示例', zht: '繁體中文字體範例', ko: '한국어 글꼴 미리보기', th: 'ตัวอย่างฟอนต์ภาษาไทย', ar: 'معاينة الخط العربي', he: 'תצוגה מקדימה של גופן', hi: 'हिन्दी फ़ॉन्ट पूर्वावलोकन', lat: 'The quick brown fox' };
 const MODE_TEXT = {
   new: 'Your original stays untouched. A fixed copy opens in a new window; check it, then save it under a new name.',
@@ -70,6 +89,7 @@ async function doScan() {
 }
 
 Office.onReady(() => {
+  checkVersion();
   const sel = $('lang');
   const ph = new Option('Select language…', '', true, true); ph.disabled = true; sel.add(ph);
   Object.entries(FontFix.LANGS)                     // A–Z by name, "Other" last
