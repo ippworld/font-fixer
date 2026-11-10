@@ -43,7 +43,7 @@ body.busy::before{content:"";position:fixed;top:0;left:0;height:3px;width:40%;ba
 @media(prefers-reduced-motion:reduce){body.busy::before{animation:none;width:100%}}
 .ver{margin-left:4px;padding:1px 7px;border-radius:999px;background:var(--soft);color:var(--acc);font-size:10.5px;font-weight:600;vertical-align:middle;white-space:nowrap}</style></head>
 <body>
-<header><div class="mark" aria-hidden="true">Aa</div><div><h1>Font Fixer <span class="ver" id="ver">v1.4 · 10 Nov 2026</span></h1><p>Replace fonts across the whole deck</p></div></header>
+<header><div class="mark" aria-hidden="true">Aa</div><div><h1>Font Fixer <span class="ver" id="ver">v1.5 · 10 Nov 2026</span></h1><p>Replace fonts across the whole deck</p></div></header>
 
 <section class="step" id="s1">
   <h2><span class="num">1</span>Find the fonts in this deck</h2>
@@ -55,7 +55,7 @@ body.busy::before{content:"";position:fixed;top:0;left:0;height:3px;width:40%;ba
 <section class="step">
   <h2><span class="num">2</span>Choose the replacement</h2>
   <label class="f">Language of the translated deck<select id="lang"></select></label>
-  <label class="f">Replacement font<input id="target" list="suggest" placeholder="e.g. Yu Gothic"></label><datalist id="suggest"></datalist>
+  <label class="f">Replacement font<input id="target" list="suggest" placeholder="Select a language first"></label><datalist id="suggest"></datalist>
   <div id="specimen"><span id="specText"></span><span id="specNote"></span></div>
   <label class="opt"><input type="checkbox" id="latin" checked><span>Match Latin text too<small>Numbers and English use the same font.</small></span></label>
   <label class="opt"><input type="checkbox" id="everywhere" checked><span>Replace in every font slot<small>Also bullets, symbols and complex-script fonts, so no copy of the old font is left.</small></span></label>

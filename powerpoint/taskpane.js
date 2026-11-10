@@ -75,6 +75,7 @@ Office.onReady(() => {
   const suggest = () => {
     $('suggest').textContent = '';
     const L = FontFix.LANGS[sel.value];
+    $('target').placeholder = L ? 'e.g. ' + L.fonts[0] : 'Select a language first';
     if (!L) { $('latin').disabled = false; return; }
     L.fonts.forEach(f => $('suggest').append(new Option(f)));
     $('latin').checked = true; $('latin').disabled = !L.slot;
