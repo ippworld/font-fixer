@@ -86,7 +86,7 @@ Office.onReady(() => {
       if (!scanned) throw new Error('Run "Scan presentation" first.');
       const sel = new Set([...document.querySelectorAll('#fonts input:checked')].map(i => i.value));
       const zip = await load();
-      const r = await FontFix.apply(zip, { target, lang: FontFix.LANGS[$('lang').value], sel, setLatin: $('latin').checked || !FontFix.LANGS[$('lang').value].slot, force: $('force').checked });
+      const r = await FontFix.apply(zip, { target, lang: FontFix.LANGS[$('lang').value], sel, setLatin: $('latin').checked || !FontFix.LANGS[$('lang').value].slot, force: $('force').checked, everywhere: $('everywhere').checked });
       if (!r.changes) { log('Nothing needed changing.'); }
       else {
         log(`Updated ${r.changes} font setting(s) in ${r.files} part(s). Re-inserting slides…`);

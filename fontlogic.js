@@ -1,6 +1,6 @@
 // Pure OOXML font logic (no Office dependency, so it can be unit-tested in Node).
 (function (g) {
-  const FONT_TAG = /<a:(latin|ea|cs)\b[^>]*?\/>/g;           // text-run font slots (bullets <a:buFont> and <a:sym> are deliberately untouched)
+  const FONT_TAG = /<a:(latin|ea|cs|sym|buFont)\b[^>]*?\/>/g;   // text font slots plus symbol (<a:sym>) and bullet (<a:buFont>) fonts
   const PARTS = /^ppt\/(slides|slideLayouts|slideMasters|notesSlides|notesMasters|handoutMasters|theme|charts|diagrams)\/[^/]+\.xml$|^ppt\/presentation\.xml$/;
   const SYMBOL = /^(wingdings|webdings|symbol|marlett|segoe (ui symbol|mdl2)|ms reference)/i;
   const faceOf = t => (t.match(/typeface="([^"]*)"/) || [, ''])[1];
@@ -44,7 +44,7 @@
     xml = xml.replace(FONT_TAG, (m, slot) => {
       if (!slots[slot]) return m;
       const f = unesc(faceOf(m));
-      if (f[0] === '+' || !(f === '' || sel.has(f))) return m;
+      if (f[0] === '+' || !((f === '' && !slots.extra[slot]) || sel.has(f))) return m;   // blanks are only filled in the language's own slots
       n++; return `<a:${slot} typeface="${esc(target)}"/>`;
     });
     // 2. Theme: per-script font entries (e.g. <a:font script="Jpan" .../>) in major and minor font sets.
@@ -54,6 +54,13 @@
       xml = xml.replace(/<a:(major|minor)Font>[\s\S]*?<\/a:\1Font>/g, blk => {
         n++;
         return re.test(blk) ? blk.replace(re, () => tag) : blk.replace(/<\/a:(major|minor)Font>/, m => tag + m);
+      });
+    }
+    // 2b. "Everywhere": other per-script theme entries (Arab, Hebr, Viet...) that still name a selected font.
+    if (/\/theme\//.test(path) && cfg.everywhere) {
+      xml = xml.replace(/<a:font script="\w+" typeface="([^"]*)"\s*\/>/g, (m, face) => {
+        if (!sel.has(unesc(face))) return m;
+        n++; return m.replace(/typeface="[^"]*"/, `typeface="${esc(target)}"`);
       });
     }
     // 3. Optional: force the font onto every run/default/end-paragraph property block that lacks one.
@@ -74,7 +81,9 @@
   }
 
   async function apply(zip, cfg) {
-    cfg.slots = { latin: cfg.setLatin, ea: cfg.lang.slot === 'ea', cs: cfg.lang.slot === 'cs' };
+    const base = { latin: cfg.setLatin, ea: cfg.lang.slot === 'ea', cs: cfg.lang.slot === 'cs', sym: false, buFont: false };
+    cfg.slots = Object.assign({}, base, { extra: {} });
+    if (cfg.everywhere) for (const s of ['ea', 'cs', 'sym', 'buFont']) if (!base[s]) { cfg.slots[s] = true; cfg.slots.extra[s] = true; }
     let files = 0, changes = 0;
     for (const p of Object.keys(zip.files).filter(p => PARTS.test(p))) {
       const src = await zip.file(p).async('string');
