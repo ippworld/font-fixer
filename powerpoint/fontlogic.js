@@ -23,6 +23,16 @@
     lat: { label: 'Other (Latin / Cyrillic / Greek)', slot: null, script: null, fonts: ['Arial', 'Segoe UI', 'Calibri'] }
   };
 
+  const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const SERIF_NAMES = /simsun|ming|mincho|batang|myungjo|times|georgia|garamond|didot|bodoni|bookman|bookmania|palatino|cambria|baskerville|caslon|minion|merriweather|playfair|lora\b|cormorant|angsana|david|constantia|century|song/i;
+  // Best guess of a font's style from its name: 'sans', 'serif', or 'keep' for symbol fonts. The user can change every guess in the pane.
+  function guessRole(name) {
+    if (SYMBOL.test(name)) return 'keep';
+    if (/serif/i.test(name) && !/sans/i.test(name)) return 'serif';
+    if (/sans/i.test(name)) return 'sans';
+    return SERIF_NAMES.test(name) ? 'serif' : 'sans';
+  }
+
   async function scan(zip) {
     const out = new Map();
     for (const p of Object.keys(zip.files).filter(p => PARTS.test(p))) {
@@ -38,33 +48,52 @@
   }
 
   function rewrite(path, xml, cfg) {
-    const { target, slots, sel, force, lang } = cfg;
-    let n = 0;
-    // 1. Replace explicit typefaces in the enabled slots (selected fonts, plus blank ones).
-    xml = xml.replace(FONT_TAG, (m, slot) => {
+    const { target, slots, map, force, lang } = cfg, theme = /\/theme\//.test(path); let n = 0;
+    const pick = f => f === '' ? target : (own(map, f) ? map[f] : null);
+    // T = the replacement chosen for this run's Latin font. Asian/complex-script text follows it so a serif run stays serif.
+    const tagRep = (m, slot, T) => {
       if (!slots[slot]) return m;
-      const f = unesc(faceOf(m));
-      if (f[0] === '+' || !((f === '' && !slots.extra[slot]) || sel.has(f))) return m;   // blanks are only filled in the language's own slots
-      n++; return `<a:${slot} typeface="${esc(target)}"/>`;
-    });
-    // 2. Theme: per-script font entries (e.g. <a:font script="Jpan" .../>) in major and minor font sets.
-    if (/\/theme\//.test(path) && lang.script) {
+      const f = unesc(faceOf(m)); let to;
+      if (T && (slot === 'ea' || slot === 'cs')) to = T;
+      else { if (f[0] === '+' || (f === '' && slots.extra[slot])) return m; to = pick(f); }
+      if (!to || to === f) return m;
+      n++; return `<a:${slot} typeface="${esc(to)}"/>`;
+    };
+    if (theme) xml = xml.replace(FONT_TAG, (m, slot) => tagRep(m, slot, null));
+    else {
+      xml = xml.replace(/<a:(rPr|defRPr|endParaRPr)\b((?:\s[^>]*[^/>])?)>([\s\S]*?)<\/a:\1>/g, (m, tag, attrs, inner) => {
+        const lat = inner.match(/<a:latin\b[^>]*?\/>/), f = lat ? unesc(faceOf(lat[0])) : '';
+        const T = (cfg.pair && f && f[0] !== '+' && own(map, f)) ? map[f] : null;
+        let out = inner.replace(FONT_TAG, (t, slot) => tagRep(t, slot, T));
+        if (T) {
+          const needEa = slots.ea && !/<a:ea\b/.test(out), needCs = slots.cs && !/<a:cs\b/.test(out);
+          const E = `<a:ea typeface="${esc(T)}"/>`, C = `<a:cs typeface="${esc(T)}"/>`;
+          if (needEa) { out = out.replace(/<a:latin\b[^>]*?\/>/, x => x + E + (needCs ? C : '')); n += needCs ? 2 : 1; }
+          else if (needCs) { const re = /<a:ea\b[^>]*?\/>/.test(out) ? /<a:ea\b[^>]*?\/>/ : /<a:latin\b[^>]*?\/>/; out = out.replace(re, x => x + C); n++; }
+        }
+        return out === inner ? m : `<a:${tag}${attrs}>${out}</a:${tag}>`;
+      });
+      xml = xml.replace(/<a:buFont\b[^>]*?\/>/g, m => tagRep(m, 'buFont', null));
+    }
+    // Theme: the chosen language's per-script entry (e.g. <a:font script="Hans" .../>) in the major and minor font sets.
+    if (theme && lang.script) {
       const re = new RegExp(`<a:font script="${lang.script}" typeface="[^"]*"\\s*/>`);
       const tag = `<a:font script="${lang.script}" typeface="${esc(target)}"/>`;
       xml = xml.replace(/<a:(major|minor)Font>[\s\S]*?<\/a:\1Font>/g, blk => {
-        n++;
-        return re.test(blk) ? blk.replace(re, () => tag) : blk.replace(/<\/a:(major|minor)Font>/, m => tag + m);
+        const nb = re.test(blk) ? blk.replace(re, () => tag) : blk.replace(/<\/a:(major|minor)Font>/, m => tag + m);
+        if (nb !== blk) n++; return nb;
       });
     }
-    // 2b. "Everywhere": other per-script theme entries (Arab, Hebr, Viet...) that still name a selected font.
-    if (/\/theme\//.test(path) && cfg.everywhere) {
+    // "Everywhere": other per-script theme entries (Arab, Hebr, Viet...) that still name a mapped font.
+    if (theme && cfg.everywhere) {
       xml = xml.replace(/<a:font script="\w+" typeface="([^"]*)"\s*\/>/g, (m, face) => {
-        if (!sel.has(unesc(face))) return m;
-        n++; return m.replace(/typeface="[^"]*"/, `typeface="${esc(target)}"`);
+        const f = unesc(face), to = own(map, f) ? map[f] : null;
+        if (!to || to === f) return m;
+        n++; return m.replace(/typeface="[^"]*"/, `typeface="${esc(to)}"`);
       });
     }
-    // 3. Optional: force the font onto every run/default/end-paragraph property block that lacks one.
-    if (force && !/\/theme\//.test(path)) {
+    // Optional: force the font onto every run/default/end-paragraph property block that lacks one.
+    if (force && !theme) {
       xml = xml.replace(/<a:(rPr|defRPr|endParaRPr)\b([^>]*?)(\/>|>([\s\S]*?)<\/a:\1>)/g, (m, tag, attrs, tail, inner) => {
         inner = inner || '';
         let add = '';
@@ -72,7 +101,7 @@
           if (slots[s] && !new RegExp(`<a:${s}\\b`).test(inner)) add += `<a:${s} typeface="${esc(target)}"/>`;
         if (!add) return m;
         n++;
-        const i = inner.search(/<a:(sym|hlinkClick|hlinkMouseOver|rtl|extLst)\b/);   // schema order: latin, ea, cs come before these
+        const i = inner.search(/<a:(sym|hlinkClick|hlinkMouseOver|rtl|extLst)\b/);
         inner = i < 0 ? inner + add : inner.slice(0, i) + add + inner.slice(i);
         return `<a:${tag}${attrs}>${inner}</a:${tag}>`;
       });
@@ -84,6 +113,8 @@
     const base = { latin: cfg.setLatin, ea: cfg.lang.slot === 'ea', cs: cfg.lang.slot === 'cs', sym: false, buFont: false };
     cfg.slots = Object.assign({}, base, { extra: {} });
     if (cfg.everywhere) for (const s of ['ea', 'cs', 'sym', 'buFont']) if (!base[s]) { cfg.slots[s] = true; cfg.slots.extra[s] = true; }
+    if (!cfg.map) cfg.map = Object.fromEntries([...(cfg.sel || [])].map(f => [f, cfg.target]));   // one font for every selected font
+    if (cfg.pair === undefined) cfg.pair = true;
     let files = 0, changes = 0;
     for (const p of Object.keys(zip.files).filter(p => PARTS.test(p))) {
       const src = await zip.file(p).async('string');
@@ -93,6 +124,6 @@
     return { files, changes };
   }
 
-  const api = { scan, apply, rewrite, LANGS, SYMBOL };
+  const api = { scan, apply, rewrite, LANGS, SYMBOL, guessRole };
   if (typeof module !== 'undefined') module.exports = api; else g.FontFix = api;
 })(typeof window !== 'undefined' ? window : globalThis);

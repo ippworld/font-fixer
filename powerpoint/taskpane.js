@@ -6,15 +6,15 @@ const busy = b => {
 };
 const SAMPLES = { ja: '日本語のフォント見本', zhs: '简体中文字体示例', zht: '繁體中文字體範例', ko: '한국어 글꼴 미리보기', th: 'ตัวอย่างฟอนต์ภาษาไทย', ar: 'معاينة الخط العربي', he: 'תצוגה מקדימה של גופן', hi: 'हिन्दी फ़ॉन्ट पूर्वावलोकन', lat: 'The quick brown fox' };
 function specimen() {
-  const f = $('target').value.trim(), l = $('lang').value;
-  $('specText').textContent = l ? SAMPLES[l] + ' Aa 0123' : 'Aa 0123';
-  $('specText').dir = (l === 'ar' || l === 'he') ? 'rtl' : 'ltr';
+  const f = $('target').value.trim(), f2 = $('target2').value.trim() || f, l = $('lang').value;
+  const t = l ? SAMPLES[l] + ' Aa 0123' : 'Aa 0123', dir = (l === 'ar' || l === 'he') ? 'rtl' : 'ltr';
+  [['specText', f], ['specText2', f2]].forEach(([id, ff]) => { const e = $(id); e.textContent = t; e.dir = dir; e.style.fontFamily = ff ? JSON.stringify(ff) + ', sans-serif' : ''; });
   document.querySelectorAll('#chips button').forEach(b => b.classList.toggle('on', b.textContent === f));
-  $('specText').style.fontFamily = f ? JSON.stringify(f) + ', sans-serif' : '';
-  $('specNote').textContent = f ? `Preview in ${f} (shows only if the font is installed)` : 'Type a font name to preview it';
+  document.querySelectorAll('#chips2 button').forEach(b => b.classList.toggle('on', b.textContent === $('target2').value.trim()));
+  $('specNote').textContent = f ? 'Top line: sans-serif text. Bottom line: serif text. (Shown only if the fonts are installed.)' : 'Pick or type a font to preview it';
 }
 let scanned = false;
-const BUILD = { app: 'powerpoint', version: '1.7', date: '10 Nov 2026' };
+const BUILD = { app: 'powerpoint', version: '1.8', date: '11 Nov 2026' };
 const cmpV = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
 function reloadLatest() { const u = new URL(location.href); u.searchParams.set('r', Date.now()); location.replace(u.toString()); }   // keeps Office's own query string
 async function checkVersion() {
@@ -73,17 +73,19 @@ async function doScan() {
   box.textContent = '';
   const max = Math.max(1, ...[...found.values()].map(v => v.n));
   [...found].sort((a, b) => b[1].n - a[1].n).forEach(([name, v]) => {
-    const row = document.createElement('label'); row.className = 'row';
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = name; cb.checked = !FontFix.SYMBOL.test(name);
+    const row = document.createElement('div'); row.className = 'row'; row.dataset.font = name;
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = name; nm.style.fontFamily = JSON.stringify(name) + ', sans-serif';
     const sm = document.createElement('small'); sm.textContent = `${v.n} use${v.n > 1 ? 's' : ''} in ${[...v.areas].join(', ')}`;
     const bar = document.createElement('i'); bar.className = 'bar'; const fill = document.createElement('b'); fill.style.width = Math.max(4, 100 * v.n / max) + '%'; bar.append(fill);
-    row.append(cb, nm, sm, bar); box.append(row);
+    const role = document.createElement('select'); role.className = 'role'; role.setAttribute('aria-label', 'Style of ' + name);
+    [['sans', 'Sans'], ['serif', 'Serif'], ['keep', 'Keep']].forEach(([val, txt]) => role.add(new Option(txt, val)));
+    role.value = FontFix.guessRole(name);
+    row.append(nm, sm, bar, role); box.append(row);
   });
-  $('summary').textContent = found.size ? `${found.size} font${found.size > 1 ? 's' : ''} found. Untick any you want to keep.` : 'No explicit fonts found.';
+  $('summary').textContent = found.size ? `${found.size} font${found.size > 1 ? 's' : ''} found. Each is set to Sans, Serif or Keep: please check the guesses.` : 'No explicit fonts found.';
   $('s1').classList.toggle('done', found.size > 0);
   scanned = found.size > 0;
-  log(found.size ? `Found ${found.size} font(s). Untick any you want to keep (symbol fonts are unticked by default).` : 'No explicit fonts found (everything inherits theme fonts).');
+  log(found.size ? `Found ${found.size} font(s). Check the Sans / Serif guesses (symbol fonts are set to Keep).` : 'No explicit fonts found (everything inherits theme fonts).');
 }
 
 Office.onReady(() => {
@@ -96,15 +98,18 @@ Office.onReady(() => {
   const suggest = () => {
     $('suggest').textContent = '';
     const L = FontFix.LANGS[sel.value];
-    $('target').placeholder = L ? 'e.g. ' + L.fonts[0] : 'Select a language first';
-    const chips = $('chips'); chips.textContent = '';
-    $('hint').textContent = L ? 'Tap a suggested font above, or type the name of any font installed on your computer.' : 'First choose the language, then pick a suggested font or type your own.';
+    $('target').placeholder = L ? 'e.g. ' + (L.fonts.find(f => FontFix.guessRole(f) === 'sans') || L.fonts[0]) : 'Select a language first';
+    $('target2').placeholder = L ? 'e.g. ' + (L.fonts.find(f => FontFix.guessRole(f) === 'serif') || 'same as above') : 'Leave empty to use the same font';
+    const chips = $('chips'); chips.textContent = ''; $('chips2').textContent = '';
+    $('hint').textContent = L ? 'Tap a suggested font under each box, or type the name of any font installed on your computer. Serif is optional.' : 'First choose the language, then pick a suggested font or type your own.';
     if (!L) { $('latin').disabled = false; return; }
-    L.fonts.forEach(f => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f; b.onclick = () => { $('target').value = f; specimen(); }; chips.append(b); });
+    const sansL = L.fonts.filter(f => FontFix.guessRole(f) === 'sans'), serifL = L.fonts.filter(f => FontFix.guessRole(f) === 'serif');
+    const mk = (box, list, field) => (list.length ? list : L.fonts).forEach(f => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f; b.onclick = () => { $(field).value = f; specimen(); }; box.append(b); });
+    mk(chips, sansL, 'target'); mk($('chips2'), serifL, 'target2');
     L.fonts.forEach(f => $('suggest').append(new Option(f)));
     $('latin').checked = true; $('latin').disabled = !L.slot;
   };
-  sel.onchange = () => { suggest(); specimen(); }; suggest(); specimen(); $('target').oninput = specimen;
+  sel.onchange = () => { suggest(); specimen(); }; suggest(); specimen(); $('target').oninput = specimen; $('target2').oninput = specimen;
   $('backup').onchange = () => busy(false);
 
   $('scan').onclick = async () => { busy(true); try { await doScan(); } catch (e) { log('Error: ' + (e.message || e)); } busy(false); };
@@ -113,11 +118,13 @@ Office.onReady(() => {
     try {
       const target = $('target').value.trim();
       if (!$('lang').value) throw new Error('Choose the language of the translated file first.');
-      if (!target) throw new Error('Enter a target font.');
+      if (!target) throw new Error('Enter the sans-serif replacement font first.');
       if (!scanned) throw new Error('Run "Scan presentation" first.');
-      const sel = new Set([...document.querySelectorAll('#fonts input:checked')].map(i => i.value));
+      const target2 = $('target2').value.trim() || target, map = {};
+      document.querySelectorAll('#fonts .row').forEach(r => { const v = r.querySelector('select').value; if (v !== 'keep') map[r.dataset.font] = v === 'serif' ? target2 : target; });
+      if (!Object.keys(map).length) throw new Error('Every font is set to Keep. Set at least one font to Sans or Serif.');
       const zip = await load();
-      const r = await FontFix.apply(zip, { target, lang: FontFix.LANGS[$('lang').value], sel, setLatin: $('latin').checked || !FontFix.LANGS[$('lang').value].slot, force: $('force').checked, everywhere: $('everywhere').checked });
+      const r = await FontFix.apply(zip, { target, lang: FontFix.LANGS[$('lang').value], map, pair: $('pair').checked, setLatin: $('latin').checked || !FontFix.LANGS[$('lang').value].slot, force: $('force').checked, everywhere: $('everywhere').checked });
       if (!r.changes) { log('Nothing needed changing.'); }
       else {
         log(`Updated ${r.changes} font setting(s) in ${r.files} part(s). Re-inserting slides…`);

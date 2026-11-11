@@ -26,6 +26,16 @@
     lat: { label: 'Other (Latin / Cyrillic / Greek)', slot: null, script: null, fonts: ['Arial', 'Segoe UI', 'Calibri'] }
   };
 
+  const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const SERIF_NAMES = /simsun|ming|mincho|batang|myungjo|times|georgia|garamond|didot|bodoni|bookman|bookmania|palatino|cambria|baskerville|caslon|minion|merriweather|playfair|lora\b|cormorant|angsana|david|constantia|century|song/i;
+  // Best guess of a font's style from its name: 'sans', 'serif', or 'keep' for symbol fonts. The user can change every guess in the pane.
+  function guessRole(name) {
+    if (SYMBOL.test(name)) return 'keep';
+    if (/serif/i.test(name) && !/sans/i.test(name)) return 'serif';
+    if (/sans/i.test(name)) return 'sans';
+    return SERIF_NAMES.test(name) ? 'serif' : 'sans';
+  }
+
   async function scan(zip) {
     const out = new Map();
     const add = (f, p) => { if (!f || f[0] === '+') return; const e = out.get(f) || { n: 0, areas: new Set() }; e.n++; e.areas.add(area(p)); out.set(f, e); };
@@ -38,33 +48,47 @@
   }
 
   function rewrite(path, xml, cfg) {
-    const { target, slots, sel, force, lang } = cfg;
+    const { target, slots, map, force, lang } = cfg;
+    const pick = f => f === '' ? target : (own(map, f) ? map[f] : null);
     const theme = /\/theme\//.test(path); let n = 0;
     // DrawingML fonts (theme, charts, SmartArt)
     xml = xml.replace(A_FONT, (m, slot) => {
       if (!slots[slot]) return m;
       const f = unesc(faceOf(m));
-      if (f[0] === '+' || !((f === '' && !slots.extra[slot]) || sel.has(f))) return m;
-      n++; return `<a:${slot} typeface="${esc(target)}"/>`;
+      if (f[0] === '+' || (f === '' && slots.extra[slot])) return m;
+      const to = pick(f); if (!to || to === f) return m;
+      n++; return `<a:${slot} typeface="${esc(to)}"/>`;
     });
     if (theme && lang.script) {
       const re = new RegExp(`<a:font script="${lang.script}" typeface="[^"]*"\\s*/>`);
       const tag = `<a:font script="${lang.script}" typeface="${esc(target)}"/>`;
       xml = xml.replace(/<a:(major|minor)Font>[\s\S]*?<\/a:\1Font>/g, blk => { n++; return re.test(blk) ? blk.replace(re, () => tag) : blk.replace(/<\/a:(major|minor)Font>/, m => tag + m); });
     }
-    if (theme && cfg.everywhere) {      // other per-script theme entries (Arab, Hebr, Viet...) that still name a selected font
+    if (theme && cfg.everywhere) {      // other per-script theme entries (Arab, Hebr, Viet...) that still name a mapped font
       xml = xml.replace(/<a:font script="\w+" typeface="([^"]*)"\s*\/>/g, (m, face) => {
-        if (!sel.has(unesc(face))) return m;
-        n++; return m.replace(/typeface="[^"]*"/, `typeface="${esc(target)}"`);
+        const f = unesc(face), to = own(map, f) ? map[f] : null;
+        if (!to || to === f) return m;
+        n++; return m.replace(/typeface="[^"]*"/, `typeface="${esc(to)}"`);
       });
     }
-    // WordprocessingML fonts: only explicit attributes (theme-linked ones follow the updated theme)
+    // WordprocessingML fonts. With "pair" on, East Asian / complex-script fonts follow the run's Latin (ascii) font choice.
     xml = xml.replace(W_FONT, tag => {
       let t = tag;
+      const val = a => { const m = tag.match(new RegExp(`\\sw:${a}="([^"]*)"`)); return m && !new RegExp(`\\sw:${a}Theme=`).test(tag) ? unesc(m[1]) : null; };
+      const lf = val('ascii') || val('hAnsi'), T = (cfg.pair && lf && own(map, lf)) ? map[lf] : null;
       for (const [attr, slot, th] of W_MAP) {
-        if (!slots[slot] || new RegExp(`\\sw:${th}=`).test(t)) continue;
-        const re = new RegExp(`(\\sw:${attr}=")([^"]*)(")`), m = t.match(re);
-        if (m) { const f = unesc(m[2]); if ((f === '' && !slots.extra[slot]) || sel.has(f)) { t = t.replace(re, (_, a, b, c) => a + esc(target) + c); n++; } }
+        if (!slots[slot]) continue;
+        const re = new RegExp(`(\\sw:${attr}=")([^"]*)(")`), thRe = new RegExp(`\\sw:${th}=`);
+        if (T && (slot === 'ea' || slot === 'cs')) {
+          const m = t.match(re);
+          if (m && !thRe.test(t) && unesc(m[2]) === T) continue;
+          t = t.replace(new RegExp(`\\sw:${th}="[^"]*"`), '');
+          t = re.test(t) ? t.replace(re, (_, a, b, c) => a + esc(T) + c) : t.replace(/\s*\/>$/, ` w:${attr}="${esc(T)}"/>`);
+          n++; continue;
+        }
+        if (thRe.test(t)) continue;
+        const m = t.match(re);
+        if (m) { const f = unesc(m[2]), to = pick(f); if (to && to !== f && !(f === '' && slots.extra[slot])) { t = t.replace(re, (_, a, b, c) => a + esc(to) + c); n++; } }
         else if (force) { t = t.replace(/\s*\/>$/, ` w:${attr}="${esc(target)}"/>`); n++; }
       }
       return t;
@@ -86,6 +110,8 @@
     const base = { latin: cfg.setLatin, ea: cfg.lang.slot === 'ea', cs: cfg.lang.slot === 'cs' };
     cfg.slots = Object.assign({}, base, { extra: {} });
     if (cfg.everywhere) for (const s of ['ea', 'cs']) if (!base[s]) { cfg.slots[s] = true; cfg.slots.extra[s] = true; }
+    if (!cfg.map) cfg.map = Object.fromEntries([...(cfg.sel || [])].map(f => [f, cfg.target]));
+    if (cfg.pair === undefined) cfg.pair = true;
     let files = 0, changes = 0;
     for (const p of Object.keys(zip.files).filter(p => PARTS.test(p))) {
       const src = await zip.file(p).async('string'), r = rewrite(p, src, cfg);
@@ -94,6 +120,6 @@
     return { files, changes };
   }
 
-  const api = { scan, apply, rewrite, LANGS, SYMBOL };
+  const api = { scan, apply, rewrite, LANGS, SYMBOL, guessRole };
   if (typeof module !== 'undefined') module.exports = api; else g.FontFix = api;
 })(typeof window !== 'undefined' ? window : globalThis);
